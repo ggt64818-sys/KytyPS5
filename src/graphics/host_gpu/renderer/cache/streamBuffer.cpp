@@ -84,6 +84,10 @@ Buffer::Buffer(GraphicContext& graphics, CommandScheduler& scheduler, MemoryUsag
 	    &native_buffer, &m_allocation, &allocation_result));
 	if (result != vk::Result::eSuccess) {
 		graphics.LogMemoryBudget();
+		LOGF("Buffer create FAILED: result=%s size=%llu flags=0x%llx usage=%d cpu_address=0x%llx\n",
+		     vk::to_string(result).c_str(), static_cast<unsigned long long>(size),
+		     static_cast<unsigned long long>(static_cast<VkBufferUsageFlags>(flags)),
+		     static_cast<int>(usage), static_cast<unsigned long long>(cpu_address));
 	}
 	EXIT_NOT_IMPLEMENTED(result != vk::Result::eSuccess);
 
