@@ -67,8 +67,10 @@ Buffer::Buffer(GraphicContext& graphics, CommandScheduler& scheduler, MemoryUsag
 	buffer_info.usage       = flags;
 
 	const bool with_bda = bool(flags & vk::BufferUsageFlagBits::eShaderDeviceAddress);
-	const VmaAllocationCreateFlags bda_flag =
-	    with_bda ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
+	// BDA buffers must NOT be dedicated: each dedicated buffer is one VkDeviceMemory and a game
+	// that wraps thousands of guest buffers blows past the driver's maxMemoryAllocationCount
+	// (VK_ERROR_OUT_OF_DEVICE_MEMORY despite free VRAM). VMA pools them into shared blocks.
+	const VmaAllocationCreateFlags bda_flag = 0;
 	VmaAllocationCreateInfo allocation_info {};
 	allocation_info.flags =
 	    VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT | bda_flag | AllocationFlags(usage);

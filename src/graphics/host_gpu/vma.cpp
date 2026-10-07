@@ -70,11 +70,14 @@ void GraphicContext::LogMemoryBudget() const {
 	vmaGetHeapBudgets(allocator, budgets);
 	for (uint32_t i = 0; i < properties.memoryHeapCount; i++) {
 		LOGF("VMA heap %u: usage=%" PRIu64 ", budget=%" PRIu64 ", allocation=%" PRIu64
-		     ", blocks=%" PRIu64 "\n",
+		     ", blocks=%" PRIu64 ", alloc_count=%u\n",
 		     i, static_cast<uint64_t>(budgets[i].usage), static_cast<uint64_t>(budgets[i].budget),
 		     static_cast<uint64_t>(budgets[i].statistics.allocationBytes),
-		     static_cast<uint64_t>(budgets[i].statistics.blockBytes));
+		     static_cast<uint64_t>(budgets[i].statistics.blockBytes),
+		     budgets[i].statistics.allocationCount);
 	}
+	LOGF("VMA limits: maxMemoryAllocationCount=%u\n",
+	     physical_device_properties.limits.maxMemoryAllocationCount);
 }
 
 uint64_t GraphicContext::GetDeviceMemoryUsage() const {
