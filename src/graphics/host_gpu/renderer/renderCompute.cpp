@@ -373,8 +373,8 @@ void RenderExecutor::DispatchDirect(uint64_t submit_id, CommandBuffer& buffer,
 	FindBuffers(std::span {&descriptor_stage, 1u});
 	// New target buffers must exist before PrepareBda uploads the CPU writes of cached buffers.
 	const bool indirect_writes = PrepareIndirectWriteTargets(m_context, bindings);
+	m_context.CacheDmaBases(input_info.stage);
 	if (program.info.uses_dma) {
-		m_context.CacheDmaBases(input_info.stage);
 		m_context.PrepareBda();
 	}
 	RebindImages(bindings);
@@ -408,7 +408,8 @@ void RenderExecutor::DispatchDirect(uint64_t submit_id, CommandBuffer& buffer,
 		LOGF("GraphicsRenderDispatchDirect: frame=%u shader=0x%016" PRIx64
 		     " hash=0x%016" PRIx64 " tick=%" PRIu64
 		     " groups=%ux%ux%u mode=0x%08" PRIx32 " local=%ux%ux%u "
-		     "buffers=%zu textures=%zu sampled=%zu storage=%zu samplers=%zu push=%u\n",
+		     "buffers=%zu textures=%zu sampled=%zu storage=%zu samplers=%zu push=%u "
+		     "dma=%d dma_regs=%zu\n",
 		     frame_num, sh_ctx.GetCs().cs_regs.data_addr, program.shader_hash,
 		     m_context.GetCommandScheduler().CurrentTick(),
 		     thread_group_x, thread_group_y, thread_group_z, mode,
@@ -418,7 +419,8 @@ void RenderExecutor::DispatchDirect(uint64_t submit_id, CommandBuffer& buffer,
 		     program.info.samplers.size(),
 		     program.bindings.UsesPushData()
 		         ? static_cast<uint32_t>(sizeof(ShaderRecompiler::IR::PushData))
-		         : 0u);
+		         : 0u,
+		     static_cast<int>(program.info.uses_dma), program.info.dma_base_registers.size());
 		for (uint32_t i = 0; i < program.info.buffers.size(); i++) {
 			const auto& buffer = program.info.buffers[i];
 			const auto  r      = DecodeNativeDescriptor<ShaderBufferResource>(resources.buffers[i]);
@@ -492,8 +494,8 @@ void RenderExecutor::DispatchIndirect(uint64_t submit_id, CommandBuffer& buffer,
 	const auto& program = *input_info.stage.program;
 	// New target buffers must exist before PrepareBda uploads the CPU writes of cached buffers.
 	const bool indirect_writes = PrepareIndirectWriteTargets(m_context, bindings);
+	m_context.CacheDmaBases(input_info.stage);
 	if (program.info.uses_dma) {
-		m_context.CacheDmaBases(input_info.stage);
 		m_context.PrepareBda();
 	}
 	BindSharedMemory(m_context, input_info, bindings, args_addr);

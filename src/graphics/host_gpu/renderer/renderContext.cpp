@@ -134,6 +134,9 @@ void RenderContext::CacheDmaBases(const ShaderStageRuntime& runtime) {
 	const auto&      program   = *runtime.program;
 	const auto&      user_data = runtime.resources->user_data;
 	std::shared_lock lock(m_mapped_ranges_mutex);
+	LOGF("CacheDmaBases: hash=0x%llx regs=%zu\n",
+	     static_cast<unsigned long long>(program.shader_hash),
+	     program.info.dma_base_registers.size());
 	for (const auto reg: program.info.dma_base_registers) {
 		const auto index = static_cast<uint64_t>(reg) - program.user_data_base;
 		if (reg < program.user_data_base || index + 1u >= user_data.size()) {
@@ -148,10 +151,14 @@ void RenderContext::CacheDmaBases(const ShaderStageRuntime& runtime) {
 		// DMA reaches only memory with a cached buffer; any other access records a fault and
 		// reads zero, and the buffer arrives after the shader has run. That loses data the guest
 		// writes for a single dispatch, such as the glyph bitmaps GTA V copies into its font atlas.
+		size_t hits = 0;
 		m_mapped_ranges.ForEachInRange(base, BufferCache::CACHING_PAGESIZE,
-		                               [this](uint64_t start, uint64_t end) {
+		                               [&](uint64_t start, uint64_t end) {
 			                               (void)m_buffer_cache.FindBuffer(start, end - start);
+			                               hits++;
 		                               });
+		LOGF("CacheDmaBases: base=0x%llx reg=%u mapped_ranges=%zu\n",
+		     static_cast<unsigned long long>(base), reg, hits);
 	}
 }
 
