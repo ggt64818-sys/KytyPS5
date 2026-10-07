@@ -30,14 +30,50 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <mutex>
 #include <span>
+#include <string>
+#include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace Libs::Graphics {
+
+namespace {
+
+// Experimental (debug aid): skip compute dispatches whose shader hash appears in the
+// KYTY_SKIP_DISPATCH environment variable (comma-separated hex hashes). Used to isolate
+// GPU hangs by eliding the suspect kernel without rebuilding.
+const std::unordered_set<uint64_t>& SkipDispatchHashes() {
+	static const std::unordered_set<uint64_t> hashes = [] {
+		std::unordered_set<uint64_t> result;
+		if (const char* env = std::getenv("KYTY_SKIP_DISPATCH")) {
+			std::string_view text(env);
+			while (!text.empty()) {
+				const auto comma = text.find(',');
+				const auto token = text.substr(0, comma);
+				if (!token.empty()) {
+					try {
+						result.insert(std::stoull(std::string(token), nullptr, 16));
+					} catch (...) {
+					}
+				}
+				if (comma == std::string_view::npos) {
+					break;
+				}
+				text.remove_prefix(comma + 1);
+			}
+		}
+		return result;
+	}();
+	return hashes;
+}
+
+} // namespace
 static bool FillSourcesDisjoint(std::span<const ShaderRecompiler::IR::DescriptorValue> sources,
                                  GuestRange destination, uint32_t output_buffer = UINT32_MAX) {
 	for (uint32_t i = 0; i < sources.size(); ++i) {
@@ -333,6 +369,13 @@ void RenderExecutor::DispatchDirect(uint64_t submit_id, CommandBuffer& buffer,
 
 	const auto& program   = *input_info.stage.program;
 	const auto& resources = *input_info.stage.resources;
+	if (SkipDispatchHashes().contains(program.shader_hash)) {
+		LOGF("SkipDispatch: hash=0x%llx groups=%ux%ux%u skipped (KYTY_SKIP_DISPATCH)\n",
+		     static_cast<unsigned long long>(program.shader_hash), thread_group_x, thread_group_y,
+		     thread_group_z);
+		ResetBindings();
+		return;
+	}
 	if (resources.specialization_reads.empty() &&
 	    (TryConsumeComputeMetaClear(input_info, buffer) ||
 	     TryConsumeComputeImageClear(input_info, buffer, thread_group_x, thread_group_y,
@@ -492,6 +535,12 @@ void RenderExecutor::DispatchIndirect(uint64_t submit_id, CommandBuffer& buffer,
 	PreparedBindings* descriptor_stage = &bindings;
 	FindBuffers(std::span {&descriptor_stage, 1u});
 	const auto& program = *input_info.stage.program;
+	if (SkipDispatchHashes().contains(program.shader_hash)) {
+		LOGF("SkipDispatch(indirect): hash=0x%llx skipped (KYTY_SKIP_DISPATCH)\n",
+		     static_cast<unsigned long long>(program.shader_hash));
+		ResetBindings();
+		return;
+	}
 	// New target buffers must exist before PrepareBda uploads the CPU writes of cached buffers.
 	const bool indirect_writes = PrepareIndirectWriteTargets(m_context, bindings);
 	m_context.CacheDmaBases(input_info.stage);

@@ -155,6 +155,10 @@ void RenderContext::CacheDmaBases(const ShaderStageRuntime& runtime) {
 		m_mapped_ranges.ForEachInRange(base, BufferCache::CACHING_PAGESIZE,
 		                               [&](uint64_t start, uint64_t end) {
 			                               (void)m_buffer_cache.FindBuffer(start, end - start);
+			                               LOGF("CacheDmaBases: window=0x%llx-0x%llx bytes=%llu\n",
+			                                    static_cast<unsigned long long>(start),
+			                                    static_cast<unsigned long long>(end),
+			                                    static_cast<unsigned long long>(end - start));
 			                               hits++;
 		                               });
 		LOGF("CacheDmaBases: base=0x%llx reg=%u mapped_ranges=%zu\n",
